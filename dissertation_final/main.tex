@@ -1,0 +1,110 @@
+\documentclass[12pt,a4paper,oneside]{book}
+
+% ========== Packages ==========
+\usepackage[utf8]{inputenc}
+\usepackage[T1,T2A]{fontenc}
+\usepackage[english,russian]{babel}
+\usepackage{graphicx}
+\usepackage{amsmath,amsfonts,amssymb}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{fancyhdr}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{float}
+\usepackage{natbib}
+\usepackage{url}
+\usepackage{csquotes}
+
+% ========== Page Setup ==========
+\geometry{
+    a4paper,
+    left=3cm,
+    right=2cm,
+    top=2.5cm,
+    bottom=2.5cm
+}
+
+% Line spacing
+\onehalfspacing
+
+% ========== Headers and Footers ==========
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[R]{\thepage}
+\fancyhead[L]{\leftmark}
+\renewcommand{\headrulewidth}{0.5pt}
+
+% ========== Hyperref Setup ==========
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    filecolor=black,
+    urlcolor=blue,
+    citecolor=black,
+    pdftitle={Assessing the Impacts of Urbanization on Plant Diversity and Ecosystem Functioning},
+    pdfauthor={Shaibu Ochoche},
+    pdfsubject={Ecology},
+    pdfkeywords={Urbanization, Plant Diversity, Ecosystem Functioning, Tropical Cities, Nigeria}
+}
+
+% ========== Graphics Path ==========
+\graphicspath{{figures/}}
+
+% ========== Figure and Table Captions ==========
+\captionsetup{
+    font=small,
+    labelfont=bf,
+    format=plain,
+    justification=justified,
+    singlelinecheck=false
+}
+
+% ========== Document Information ==========
+\title{Assessing the Impacts of Urbanization on Plant Diversity and Ecosystem Functioning in Tropical Cities: A Case Study of Benue State, Nigeria}
+\author{Shaibu Ochoche}
+\date{2025}
+
+% ========== Begin Document ==========
+\begin{document}
+
+% ========== Front Matter ==========
+\frontmatter
+\include{chapters/00_frontmatter}
+
+% ========== Main Matter ==========
+\mainmatter
+
+% Introduction
+\include{chapters/01_introduction}
+
+% Chapter 1: Literature Review
+\include{chapters/02_literature_review}
+
+% Chapter 2: Methodology
+\include{chapters/03_methodology}
+
+% Chapter 3: Results and Discussion
+\include{chapters/04_results_discussion}
+
+% ========== Back Matter ==========
+\backmatter
+
+% Conclusion
+\include{chapters/05_conclusion}
+
+% Recommendations
+\include{chapters/06_recommendations}
+
+% References
+\include{chapters/07_references}
+
+% Appendices
+\include{chapters/08_appendices}
+
+\end{document}

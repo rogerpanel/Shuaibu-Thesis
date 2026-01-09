@@ -1,0 +1,97 @@
+\documentclass[12pt,a4paper,oneside]{book}
+
+% Packages
+\usepackage[utf8]{inputenc}
+\usepackage[T1,T2A]{fontenc}
+\usepackage[english,russian]{babel}
+\usepackage{graphicx}
+\usepackage{amsmath}
+\usepackage{amsfonts}
+\usepackage{amssymb}
+\usepackage{hyperref}
+\usepackage{geometry}
+\usepackage{setspace}
+\usepackage{fancyhdr}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{float}
+\usepackage{natbib}
+
+% Page geometry
+\geometry{
+    a4paper,
+    left=3cm,
+    right=2cm,
+    top=2cm,
+    bottom=2cm
+}
+
+% Line spacing
+\onehalfspacing
+
+% Header and footer
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[R]{\thepage}
+\fancyhead[L]{\leftmark}
+\renewcommand{\headrulewidth}{0.5pt}
+
+% Hyperref setup
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    filecolor=black,
+    urlcolor=blue,
+    citecolor=black,
+    pdftitle={Assessing the Impacts of Urbanization on Plant Diversity and Ecosystem Functioning},
+    pdfauthor={Shaibu Ochoche},
+}
+
+% Graphics path
+\graphicspath{{figures/}}
+
+% Document information
+\title{Assessing the Impacts of Urbanization on Plant Diversity and Ecosystem Functioning in Tropical Cities: A Case Study of Benue State, Nigeria}
+\author{Shaibu Ochoche}
+\date{2025}
+
+\begin{document}
+
+% Front matter
+\frontmatter
+\include{chapters/chapter_00}
+
+
+% Main content
+\mainmatter
+
+% CHAPTER ONE ONE
+\include{chapters/chapter_01}
+
+% CHAPTER TWO TWO
+\include{chapters/chapter_02}
+
+% CHAPTER THREE THREE
+\include{chapters/chapter_03}
+
+% CHAPTER ONE ONE
+\include{chapters/chapter_04}
+
+% CHAPTER ONE ONE
+\include{chapters/chapter_05}
+
+% CHAPTER TWO TWO
+\include{chapters/chapter_06}
+
+% CHAPTER THREE THREE
+\include{chapters/chapter_07}
+
+
+% Back matter
+\backmatter
+
+\end{document}
