@@ -1,0 +1,7 @@
+group1,group2,meandiff,p-adj,lower,upper,reject,Variable
+Peri-Urban,Rural,0.0558,0.1941,-0.0223,0.1339,False,NDVI
+Peri-Urban,Urban,-0.1493,0.0,-0.2172,-0.0814,True,NDVI
+Rural,Urban,-0.2051,0.0,-0.2763,-0.1338,True,NDVI
+Peri-Urban,Rural,0.03,0.3512,-0.0234,0.0834,False,EVI
+Peri-Urban,Urban,-0.11,0.0,-0.1564,-0.0636,True,EVI
+Rural,Urban,-0.14,0.0,-0.1887,-0.0913,True,EVI
