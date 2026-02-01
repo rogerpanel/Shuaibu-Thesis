@@ -1,0 +1,238 @@
+# ========== SECTION 4.5 WORKFLOW: NDVI vs URBANIZATION METRICS ==========
+# Run this whole cell in Google Colab after uploading /content/WARD_BUFFER_DATA.xlsx
+# ======================================================================
+
+# 0. (Optional) install anything missing (uncomment if needed)
+# !pip install --quiet openpyxl   # usually present; uncomment if read_excel fails
+
+# 1. IMPORTS
+import os
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
+from statsmodels.stats.outliers_influence import variance_inflation_factor
+from statsmodels.stats.diagnostic import het_breuschpagan
+from statsmodels.stats.anova import anova_lm
+from statsmodels.stats.api import anova_lm
+from statsmodels.graphics.gofplots import qqplot
+from statsmodels.stats.stattools import durbin_watson
+
+from scipy import stats
+
+sns.set(style="whitegrid")
+
+# 2. FOLDERS
+BASE = "/content/Model_Results"
+F_451 = os.path.join(BASE, "4.5.1_Urbanization_Summary")
+F_452 = os.path.join(BASE, "4.5.2_Regression_Model")
+F_453 = os.path.join(BASE, "4.5.3_Model_Diagnostics")
+for p in (F_451, F_452, F_453):
+    os.makedirs(p, exist_ok=True)
+
+plots_folder = os.path.join(BASE, "plots_4_5")
+os.makedirs(plots_folder, exist_ok=True)
+
+# 3. LOAD DATA
+file_path = "/content/WARD_BUFFER_DATA.xlsx"   # <-- ensure uploaded
+df = pd.read_excel(file_path)
+
+# Quick peek
+print("Rows/Cols:", df.shape)
+display(df.head(6))
+
+# 4. SELECT VARIABLES (use exactly as in your table)
+# Dependent variable
+y_col = "NDVI"
+# Predictors
+predictors = ["BuiltUP", "NTL", "POP"]
+# Zone and Ward columns for grouping/diagnostics
+zone_col = "Zone"
+ward_col = "Ward"
+
+# 5. CLEAN: drop rows missing NDVI or predictors or Zone
+df_model = df.dropna(subset=[y_col] + predictors + [zone_col, ward_col]).copy()
+df_model.reset_index(drop=True, inplace=True)
+print("After dropping missing rows:", df_model.shape)
+
+# If BuiltUP looks like 0..5 etc and actually is percent (0-100) no change.
+# If you need to convert units, do it here (e.g., BuiltUP_percent = BuiltUP*100). 
+# For now we use values as-is.
+
+# =========================
+# 4.5.1 Urbanization summary
+# =========================
+
+# 4.5.1.a Descriptive statistics (mean, std, min, max, median, n)
+desc = df_model[predictors].agg(['count','mean','std','min','median','max']).T
+desc = desc.rename(columns={
+    'count':'n','mean':'mean','std':'std','min':'min','median':'median','max':'max'
+})
+desc.to_csv(os.path.join(F_451, "urbanization_summary_stats.csv"))
+print("Saved: urbanization_summary_stats.csv")
+
+# 4.5.1.b Correlation matrix (Pearson) and p-values
+corr = df_model[predictors].corr(method='pearson')
+corr.to_csv(os.path.join(F_451, "urbanization_correlation_matrix.csv"))
+print("Saved: urbanization_correlation_matrix.csv")
+
+# correlation p-values matrix
+def corr_pvals(df_in):
+    cols = df_in.columns
+    pmat = pd.DataFrame(np.zeros((len(cols), len(cols))), columns=cols, index=cols)
+    for i in range(len(cols)):
+        for j in range(len(cols)):
+            if i==j:
+                pmat.iloc[i,j] = 0.0
+            else:
+                r, p = stats.pearsonr(df_in.iloc[:,i], df_in.iloc[:,j])
+                pmat.iloc[i,j] = p
+    return pmat
+
+pvals = corr_pvals(df_model[predictors])
+pvals.to_csv(os.path.join(F_451, "urbanization_correlation_pvalues.csv"))
+print("Saved: urbanization_correlation_pvalues.csv")
+
+# 4.5.1.c Correlation heatmap (purple theme)
+plt.figure(figsize=(5,4))
+cmap = sns.color_palette("Purples", as_cmap=True)
+sns.heatmap(corr, annot=True, fmt=".2f", cmap=cmap, square=True, vmin=-1, vmax=1)
+plt.tight_layout()
+heatmap_path = os.path.join(F_451, "correlation_heatmap_purple.png")
+plt.savefig(heatmap_path, dpi=880)
+plt.show()
+print("Saved:", heatmap_path)
+
+# =========================
+# 4.5.2 Regression model
+# =========================
+
+# Build design matrix
+X = df_model[predictors].astype(float)
+X = sm.add_constant(X)  # adds intercept
+y = df_model[y_col].astype(float)
+
+# Fit OLS
+model = sm.OLS(y, X).fit()
+print(model.summary())
+
+# 4.5.2.a Save coefficients table (beta, se, t, p, [95%CI])
+coef_table = model.summary2().tables[1].reset_index().rename(columns={'index':'term'})
+# compute 95% CI
+ci = model.conf_int(alpha=0.05)
+ci.columns = ['ci_lower','ci_upper']
+coef_table['ci_lower'] = ci.iloc[:,0].values
+coef_table['ci_upper'] = ci.iloc[:,1].values
+coef_table.to_csv(os.path.join(F_452, "regression_coefficients.csv"), index=False)
+print("Saved: regression_coefficients.csv")
+
+# 4.5.2.b Save model summary stats: R2, AdjR2, F, Prob(F), AIC, BIC, nobs
+model_stats = {
+    "R_squared": model.rsquared,
+    "Adj_R_squared": model.rsquared_adj,
+    "F_stat": model.fvalue,
+    "F_pvalue": model.f_pvalue,
+    "AIC": model.aic,
+    "BIC": model.bic,
+    "n_obs": int(model.nobs)
+}
+pd.DataFrame([model_stats]).to_csv(os.path.join(F_452, "regression_model_summary.csv"), index=False)
+print("Saved: regression_model_summary.csv")
+
+# Save the full text summary for convenience
+with open(os.path.join(F_452, "regression_summary_text.txt"), "w") as f:
+    f.write(model.summary().as_text())
+print("Saved: regression_summary_text.txt")
+
+# 4.5.2.c Residuals & fitted values table per ward
+df_resid = df_model[[ward_col, zone_col, y_col] + predictors].copy()
+df_resid['fitted'] = model.fittedvalues
+df_resid['residual'] = model.resid
+df_resid.to_csv(os.path.join(F_452, "residuals_and_fitted_by_ward.csv"), index=False)
+print("Saved: residuals_and_fitted_by_ward.csv")
+
+# Plots: Residuals vs Fitted
+plt.figure(figsize=(6,4))
+plt.scatter(model.fittedvalues, model.resid, color='purple', alpha=0.7)
+plt.axhline(0, color='gray', linestyle='--')
+plt.xlabel("Fitted values")
+plt.ylabel("Residuals")
+plt.tight_layout()
+rvf_path = os.path.join(F_452, "residuals_vs_fitted.png")
+plt.savefig(rvf_path, dpi=880)
+plt.show()
+print("Saved:", rvf_path)
+
+# QQ plot for residuals
+fig = qqplot(model.resid, line='s')
+plt.title("")  # no top title
+qq_path = os.path.join(F_452, "qqplot_residuals.png")
+fig.savefig(qq_path, dpi=880)
+plt.show()
+print("Saved:", qq_path)
+
+# =========================
+# 4.5.3 Model diagnostics
+# =========================
+
+# 4.5.3.a VIF calculation
+# For VIF, use the design matrix without constant
+vif_X = X.drop(columns='const')
+vif_data = pd.DataFrame({
+    "variable": vif_X.columns,
+    "VIF": [variance_inflation_factor(vif_X.values, i) for i in range(vif_X.shape[1])]
+})
+vif_data.to_csv(os.path.join(F_453, "vif_results.csv"), index=False)
+print("Saved: vif_results.csv")
+
+# 4.5.3.b Residual normality: Shapiro-Wilk overall + by Zone
+sw_overall = stats.shapiro(model.resid)
+# by zone
+shapiro_by_zone = []
+for z, grp in df_resid.groupby(zone_col):
+    w, p = stats.shapiro(grp['residual'])
+    shapiro_by_zone.append({"Zone": z, "W": float(w), "p_value": float(p), "n": int(len(grp))})
+
+pd.DataFrame([{"W": float(sw_overall[0]), "p_value": float(sw_overall[1]), "n": len(model.resid)}]).to_csv(os.path.join(F_453, "shapiro_residuals_overall.csv"), index=False)
+pd.DataFrame(shapiro_by_zone).to_csv(os.path.join(F_453, "shapiro_residuals_by_zone.csv"), index=False)
+print("Saved: shapiro_residuals_overall.csv and shapiro_residuals_by_zone.csv")
+
+# 4.5.3.c Homoscedasticity: Breusch-Pagan test
+bp_test = het_breuschpagan(model.resid, model.model.exog)
+bp_names = ["Lagrange multiplier statistic","p-value","f-value","f p-value"]
+bp_df = pd.DataFrame([bp_test], columns=bp_names)
+bp_df.to_csv(os.path.join(F_453, "breusch_pagan_test.csv"), index=False)
+print("Saved: breusch_pagan_test.csv")
+
+# 4.5.3.d Influence: Cook's distance
+influence = model.get_influence()
+cooks_d = influence.cooks_distance[0]
+df_cook = df_model[[ward_col, zone_col]].copy().reset_index(drop=True)
+df_cook['cooks_d'] = cooks_d
+df_cook.to_csv(os.path.join(F_453, "cooks_distance_values.csv"), index=False)
+print("Saved: cooks_distance_values.csv")
+
+# Cook's distance plot (purple)
+plt.figure(figsize=(8,4))
+plt.stem(np.arange(len(cooks_d)), cooks_d, linefmt='purple', markerfmt='o', basefmt=" ")
+plt.xlabel("Observation index")
+plt.ylabel("Cook's distance")
+plt.tight_layout()
+cooks_plot_path = os.path.join(F_453, "cooks_distance_plot.png")
+plt.savefig(cooks_plot_path, dpi=880)
+plt.show()
+print("Saved:", cooks_plot_path)
+
+# Flag influential points: use threshold 4/n
+n = len(df_model)
+threshold = 4/n
+influential = df_cook[df_cook['cooks_d'] > threshold].copy()
+influential.to_csv(os.path.join(F_453, "influential_points_flagged.csv"), index=False)
+print("Saved: influential_points_flagged.csv  (threshold 4/n = {:.6f})".format(threshold))
+
+# ============ FINISHED ============
+print("\nAll 4.5 outputs saved under:", BASE)
+print("Subfolders:\n -", F_451, "\n -", F_452, "\n -", F_453)

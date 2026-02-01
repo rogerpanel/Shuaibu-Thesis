@@ -1,0 +1,114 @@
+# ============================================================
+# 1. INSTALL & IMPORT LIBRARIES
+# ============================================================
+!pip install --quiet scikit-posthocs
+
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from statsmodels.formula.api import ols
+import statsmodels.api as sm
+from statsmodels.stats.multicomp import pairwise_tukeyhsd
+import os
+
+# ============================================================
+# 2. LOAD EXCEL FILE
+# ============================================================
+file_path = '/content/WARD_BUFFER_DATA.xlsx'  # <-- upload your Excel here
+df = pd.read_excel(file_path)
+df.head()
+
+# ============================================================
+# 3. CLEAN MISSING VALUES
+# ============================================================
+soil_vars = {
+    "SOC_0_5cm": "Soil Organic Carbon (g/kg)",
+    "N_0_5cm": "Nitrogen (g/kg)",
+    "BD_0_5cm": "Bulk Density (g/cm³)",
+    "pH_0_5cm": "pH (unitless)",
+    "CEC_0_5cm": "Cation Exchange Capacity (cmol/kg)"
+}
+
+df_clean = df.dropna(subset=list(soil_vars.keys()) + ["Zone"])
+
+# ============================================================
+# 4. CREATE OUTPUT FOLDER
+# ============================================================
+output_folder = "/content/Soil_Analysis_Results"
+os.makedirs(output_folder, exist_ok=True)
+plots_folder = os.path.join(output_folder, "plots")
+os.makedirs(plots_folder, exist_ok=True)
+
+# ============================================================
+# 5. SUMMARY TABLE: MEAN ± SD PER ZONE
+# ============================================================
+summary_table = df_clean.groupby("Zone")[list(soil_vars.keys())].agg(['mean','std'])
+summary_table.to_csv(os.path.join(output_folder, "Summary_Mean_SD_By_Zone.csv"))
+print("Summary table saved: Summary_Mean_SD_By_Zone.csv")
+
+# ============================================================
+# 6. BAR PLOTS (PURPLE) & SAVE 880 DPI PNG
+# ============================================================
+for var, full_name in soil_vars.items():
+    plt.figure(figsize=(6,4))
+    sns.barplot(
+        data=df_clean,
+        x="Zone",
+        y=var,
+        errorbar=("sd"),
+        capsize=0.2,
+        color="purple"
+    )
+    plt.ylabel(f"{full_name}")
+    plt.xlabel("Zone")
+    plt.tight_layout()
+    
+    # Save high-res PNG
+    plt.savefig(os.path.join(plots_folder, f"{var}_barplot.png"), dpi=880)
+    plt.show()
+
+print(f"All bar plots saved in {plots_folder}")
+
+# ============================================================
+# 7. ANOVA + POST-HOC + EFFECT SIZE (η²)
+# ============================================================
+anova_summary = []
+
+tukey_list = []
+
+for var in soil_vars.keys():
+    # ANOVA
+    model = ols(f"{var} ~ C(Zone)", data=df_clean).fit()
+    anova_table = sm.stats.anova_lm(model, typ=2)
+    
+    # Effect size η²
+    eta_sq = anova_table["sum_sq"]["C(Zone)"] / anova_table["sum_sq"].sum()
+    
+    # Add to merged summary
+    anova_summary.append({
+        "Variable": var,
+        "F": anova_table["F"]["C(Zone)"],
+        "p_value": anova_table["PR(>F)"]["C(Zone)"],
+        "eta_squared": eta_sq
+    })
+    
+    # Tukey HSD
+    tukey = pairwise_tukeyhsd(df_clean[var], df_clean["Zone"])
+    tukey_df = pd.DataFrame(data=tukey.summary().data[1:], columns=tukey.summary().data[0])
+    tukey_df["Variable"] = var
+    tukey_list.append(tukey_df)
+
+# ============================================================
+# 8. EXPORT MERGED STATISTICS
+# ============================================================
+# Merge ANOVA + Tukey
+anova_df = pd.DataFrame(anova_summary)
+tukey_df_merged = pd.concat(tukey_list, ignore_index=True)
+
+# Save ANOVA + effect sizes
+anova_df.to_csv(os.path.join(output_folder, "ANOVA_EffectSizes.csv"), index=False)
+# Save Tukey HSD
+tukey_df_merged.to_csv(os.path.join(output_folder, "TukeyHSD_PostHoc.csv"), index=False)
+
+print(f"ANOVA + effect sizes saved: {os.path.join(output_folder, 'ANOVA_EffectSizes.csv')}")
+print(f"Tukey HSD Post-hoc saved: {os.path.join(output_folder, 'TukeyHSD_PostHoc.csv')}")

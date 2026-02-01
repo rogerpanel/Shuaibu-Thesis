@@ -1,0 +1,106 @@
+# ============================================================
+# 1. IMPORT LIBRARIES (if not already imported)
+# ============================================================
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from statsmodels.formula.api import ols
+import statsmodels.api as sm
+from statsmodels.stats.multicomp import pairwise_tukeyhsd
+import os
+
+# ============================================================
+# 2. LOAD EXCEL FILE
+# ============================================================
+file_path = '/content/WARD_BUFFER_DATA.xlsx'  # <-- upload your Excel
+df = pd.read_excel(file_path)
+df.head()
+
+# ============================================================
+# 3. CLEAN MISSING VALUES
+# ============================================================
+vi_vars = {
+    "NDVI": "Normalized Difference Vegetation Index (NDVI)",
+    "EVI": "Enhanced Vegetation Index (EVI)"
+}
+
+df_vi = df.dropna(subset=list(vi_vars.keys()) + ["Zone"])
+
+# ============================================================
+# 4. CREATE OUTPUT FOLDER (reuse previous if exists)
+# ============================================================
+output_folder = "/content/Soil_Analysis_Results"  # same folder
+plots_folder = os.path.join(output_folder, "plots")
+os.makedirs(plots_folder, exist_ok=True)
+
+# ============================================================
+# 5. SUMMARY TABLE: MEAN ± SD PER ZONE
+# ============================================================
+vi_summary_table = df_vi.groupby("Zone")[list(vi_vars.keys())].agg(['mean','std'])
+vi_summary_table.to_csv(os.path.join(output_folder, "NDVI_EVI_Summary_Mean_SD_By_Zone.csv"))
+print("NDVI/EVI summary table saved: NDVI_EVI_Summary_Mean_SD_By_Zone.csv")
+
+# ============================================================
+# 6. BAR PLOTS (PURPLE) & SAVE 880 DPI PNG
+# ============================================================
+for var, full_name in vi_vars.items():
+    plt.figure(figsize=(6,4))
+    sns.barplot(
+        data=df_vi,
+        x="Zone",
+        y=var,
+        errorbar=("sd"),
+        capsize=0.2,
+        color="purple"
+    )
+    plt.ylabel(f"{full_name}")
+    plt.xlabel("Zone")
+    plt.tight_layout()
+    
+    # Save high-res PNG
+    plt.savefig(os.path.join(plots_folder, f"{var}_barplot.png"), dpi=880)
+    plt.show()
+
+print(f"NDVI/EVI bar plots saved in {plots_folder}")
+
+# ============================================================
+# 7. ANOVA + POST-HOC + EFFECT SIZE (η²)
+# ============================================================
+anova_summary = []
+tukey_list = []
+
+for var in vi_vars.keys():
+    # ANOVA
+    model = ols(f"{var} ~ C(Zone)", data=df_vi).fit()
+    anova_table = sm.stats.anova_lm(model, typ=2)
+    
+    # Effect size η²
+    eta_sq = anova_table["sum_sq"]["C(Zone)"] / anova_table["sum_sq"].sum()
+    
+    # Add to merged summary
+    anova_summary.append({
+        "Variable": var,
+        "F": anova_table["F"]["C(Zone)"],
+        "p_value": anova_table["PR(>F)"]["C(Zone)"],
+        "eta_squared": eta_sq
+    })
+    
+    # Tukey HSD
+    tukey = pairwise_tukeyhsd(df_vi[var], df_vi["Zone"])
+    tukey_df = pd.DataFrame(data=tukey.summary().data[1:], columns=tukey.summary().data[0])
+    tukey_df["Variable"] = var
+    tukey_list.append(tukey_df)
+
+# ============================================================
+# 8. EXPORT MERGED STATISTICS
+# ============================================================
+anova_df = pd.DataFrame(anova_summary)
+tukey_df_merged = pd.concat(tukey_list, ignore_index=True)
+
+# Save ANOVA + effect sizes
+anova_df.to_csv(os.path.join(output_folder, "NDVI_EVI_ANOVA_EffectSizes.csv"), index=False)
+# Save Tukey HSD
+tukey_df_merged.to_csv(os.path.join(output_folder, "NDVI_EVI_TukeyHSD_PostHoc.csv"), index=False)
+
+print(f"NDVI/EVI ANOVA + η² saved: {os.path.join(output_folder, 'NDVI_EVI_ANOVA_EffectSizes.csv')}")
+print(f"NDVI/EVI Tukey HSD Post-hoc saved: {os.path.join(output_folder, 'NDVI_EVI_TukeyHSD_PostHoc.csv')}")
